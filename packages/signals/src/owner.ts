@@ -1,0 +1,1 @@
+// @lattice/signals — Ownership Model
