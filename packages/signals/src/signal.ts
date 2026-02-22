@@ -1,12 +1,25 @@
-import { Signal, SignalOptions } from './types';
+import { getCurrentTracker } from './tracking';
+import { Signal, SignalOptions, Tracker } from './types';
 
 export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
   const subscribers = new Set<(newValue: T, oldValue: T) => void>();
+  const trackers = new WeakSet<Tracker>();
   const equalityCheck = options?.equals ?? Object.is;
   let _value = initial;
 
   return {
     get value() {
+      const currentTracker = getCurrentTracker();
+      if (currentTracker && !trackers.has(currentTracker)) {
+        const callback = () => null;
+        const cleanupFn = () => {
+          subscribers.delete(callback);
+          trackers.delete(currentTracker);
+        };
+        trackers.add(currentTracker);
+        subscribers.add(callback);
+        currentTracker.cleanups.push(cleanupFn);
+      }
       return _value;
     },
     set value(newValue: T) {
@@ -21,7 +34,7 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
     peek() {
       return _value;
     },
-    subscribe(callback: (newValue: T, oldValue: T) => void) {
+    subscribe(callback) {
       subscribers.add(callback);
       return () => subscribers.delete(callback);
     },
