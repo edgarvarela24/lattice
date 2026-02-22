@@ -13,3 +13,8 @@ export type SignalOptions<T> = Prettify<{
   /** Custom equality function to determine if the value has changed. */
   equals?: (a: T, b: T) => boolean;
 }>;
+
+export type Tracker = {
+  /** List of cleanup functions to run */
+  cleanups: (() => void)[];
+};

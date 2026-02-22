@@ -1,0 +1,119 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ── Build ──────────────────────────────────────────────────────────────
+    {
+      "label": "build: all",
+      "type": "shell",
+      "command": "pnpm build",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$tsc"],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "build: signals",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals build",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "build: watch (signals)",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals exec tsc -b --watch",
+      "isBackground": true,
+      "group": "build",
+      "problemMatcher": ["$tsc-watch"],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+
+    // ── Test ───────────────────────────────────────────────────────────────
+    {
+      "label": "test: all",
+      "type": "shell",
+      "command": "pnpm test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "test: signals",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals test",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "test: signals (watch)",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals test:watch",
+      "isBackground": true,
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "test: signals – tracking suite",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals exec vitest run __tests__/tracking.test.ts",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "test: signals – signal suite",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals exec vitest run __tests__/signal.test.ts",
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+
+    // ── Typecheck ──────────────────────────────────────────────────────────
+    {
+      "label": "typecheck: all",
+      "type": "shell",
+      "command": "pnpm typecheck",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "typecheck: signals",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals typecheck",
+      "group": "build",
+      "problemMatcher": ["$tsc"],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+
+    // ── Clean ──────────────────────────────────────────────────────────────
+    {
+      "label": "clean: all",
+      "type": "shell",
+      "command": "pnpm clean",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "clean: signals",
+      "type": "shell",
+      "command": "pnpm --filter @lattice/signals clean",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+
+    // ── Compound ───────────────────────────────────────────────────────────
+    {
+      "label": "rebuild & test: signals",
+      "dependsOn": ["build: signals", "test: signals"],
+      "dependsOrder": "sequence",
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}
