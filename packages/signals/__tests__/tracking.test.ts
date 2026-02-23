@@ -4,7 +4,7 @@ import { signal } from '../src/index.js';
 import type { Tracker } from '../src/types.js';
 
 function createTracker(): Tracker {
-  return { cleanups: [] };
+  return { cleanups: [], notify: () => null };
 }
 
 describe('Tracker', () => {

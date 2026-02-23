@@ -17,4 +17,12 @@ export type SignalOptions<T> = Prettify<{
 export type Tracker = {
   /** List of cleanup functions to run */
   cleanups: (() => void)[];
+  notify: () => void;
 };
+
+export type Disposable = {
+  dispose(): void;
+  active: boolean;
+};
+
+export type Effect = Disposable & Tracker;
