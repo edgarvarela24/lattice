@@ -1,13 +1,16 @@
 import type { Prettify } from '@lattice/utils';
 
-export type Signal<T> = Prettify<{
-  /** The current value of the signal. */
-  value: T;
-  /** Read the value without subscribing. */
+export type ReadonlySignal<T> = {
+  readonly value: T;
   peek(): T;
-  /** Subscribe to value changes. Returns an unsubscribe function. */
-  subscribe(cb: (newValue: T, oldValue: T) => void): () => void;
-}>;
+  subscribe(cb: () => void): () => void;
+};
+
+export type Signal<T> = Omit<ReadonlySignal<T>, 'value'> & {
+  value: T;
+};
+
+export type Computed<T> = ReadonlySignal<T> & Tracker & { dirty: boolean };
 
 export type SignalOptions<T> = Prettify<{
   /** Custom equality function to determine if the value has changed. */
