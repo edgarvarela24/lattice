@@ -41,6 +41,7 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
     },
     dirty: false,
     cleanups: [],
+    children: new Set(),
     notify: () => {
       computed.dirty = true;
       if (internalSubscribers.size > 0) {
