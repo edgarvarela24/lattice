@@ -21,6 +21,7 @@ export type Tracker = {
   /** List of cleanup functions to run */
   cleanups: (() => void)[];
   notify: () => void;
+  children: Set<Effect>;
 };
 
 export type Disposable = {
