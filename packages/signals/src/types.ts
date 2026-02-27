@@ -3,7 +3,7 @@ import type { Prettify } from '@lattice/utils';
 export type ReadonlySignal<T> = {
   readonly value: T;
   peek(): T;
-  subscribe(cb: () => void): () => void;
+  subscribe(cb: (newValue: T, oldValue: T) => void): () => void;
 };
 
 export type Signal<T> = Omit<ReadonlySignal<T>, 'value'> & {
