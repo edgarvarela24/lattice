@@ -1,3 +1,4 @@
+import { getBatchDepth, getPendingNotifications } from './batch';
 import { getCurrentTracker, runWithTracker } from './tracking';
 import { Computed, ReadonlySignal, SignalOptions, Tracker } from './types';
 
@@ -46,7 +47,13 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
         const oldValue = _value;
         evaluate();
         if (!equalityCheck(_value, oldValue)) {
-          [...internalSubscribers].forEach((subscriber) => subscriber());
+          if (getBatchDepth() > 0) {
+            [...internalSubscribers].forEach((subscriber) =>
+              getPendingNotifications().add(subscriber),
+            );
+          } else {
+            [...internalSubscribers].forEach((subscriber) => subscriber());
+          }
         }
       }
     },

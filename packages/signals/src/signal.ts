@@ -1,11 +1,24 @@
+import { getBatchDepth, getPendingNotifications } from './batch.js';
 import { getCurrentTracker } from './tracking.js';
 import type { Signal, SignalOptions, Tracker } from './types.js';
 
 export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
-  const subscribers = new Set<(newValue: T, oldValue: T) => void>();
+  const internalSubscribers = new Set<() => void>(); // tracker notifies
+  const publicSubscribers = new Set<(newValue: T, oldValue: T) => void>(); // .subscribe() callbacks
   const trackers = new WeakSet<Tracker>();
   const equalityCheck = options?.equals ?? Object.is;
   let _value = initial;
+  let _preBatchValue: T;
+  let _hasPrebatchValue = false;
+
+  const flushPublicSubscribers = () => {
+    if (_hasPrebatchValue && equalityCheck(_value, _preBatchValue)) {
+      _hasPrebatchValue = false;
+      return;
+    }
+    _hasPrebatchValue = false;
+    [...publicSubscribers].forEach((s) => s(_value, _preBatchValue));
+  };
 
   return {
     get value() {
@@ -13,11 +26,11 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
       if (currentTracker && !trackers.has(currentTracker)) {
         const callback = currentTracker.notify;
         const cleanupFn = () => {
-          subscribers.delete(callback);
+          internalSubscribers.delete(callback);
           trackers.delete(currentTracker);
         };
         trackers.add(currentTracker);
-        subscribers.add(callback);
+        internalSubscribers.add(callback);
         currentTracker.cleanups.push(cleanupFn);
       }
       return _value;
@@ -28,14 +41,24 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
         return;
       }
       _value = newValue;
-      [...subscribers].forEach((subscriber) => subscriber(newValue, oldValue));
+      if (getBatchDepth() > 0) {
+        if (!_hasPrebatchValue) {
+          _preBatchValue = oldValue;
+          _hasPrebatchValue = true;
+        }
+        getPendingNotifications().add(flushPublicSubscribers);
+        [...internalSubscribers].forEach((subscriber) => getPendingNotifications().add(subscriber));
+      } else {
+        [...internalSubscribers].forEach((subscriber) => subscriber());
+        [...publicSubscribers].forEach((subscriber) => subscriber(newValue, oldValue));
+      }
     },
     peek() {
       return _value;
     },
     subscribe(callback) {
-      subscribers.add(callback);
-      return () => subscribers.delete(callback);
+      publicSubscribers.add(callback);
+      return () => publicSubscribers.delete(callback);
     },
   };
 }
