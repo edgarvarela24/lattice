@@ -1,4 +1,4 @@
-import { getBatchDepth, getPendingNotifications } from './batch.js';
+import { batch, getBatchDepth, getPendingNotifications } from './batch.js';
 import { getCurrentTracker } from './tracking.js';
 import type { Signal, SignalOptions, Tracker } from './types.js';
 
@@ -49,8 +49,10 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
         getPendingNotifications().add(flushPublicSubscribers);
         [...internalSubscribers].forEach((subscriber) => getPendingNotifications().add(subscriber));
       } else {
-        [...internalSubscribers].forEach((subscriber) => subscriber());
-        [...publicSubscribers].forEach((subscriber) => subscriber(newValue, oldValue));
+        batch(() => {
+          [...internalSubscribers].forEach((subscriber) => subscriber());
+          [...publicSubscribers].forEach((subscriber) => subscriber(newValue, oldValue));
+        });
       }
     },
     peek() {
