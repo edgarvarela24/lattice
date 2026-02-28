@@ -1,4 +1,5 @@
 import { batch, getBatchDepth, getPendingNotifications } from './batch.js';
+import { registerObserver } from './observer-utils.js';
 import { getCurrentObserver } from './observer.js';
 import type { Signal, SignalOptions, Observer } from './types.js';
 
@@ -24,14 +25,7 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
     get value() {
       const currentObserver = getCurrentObserver();
       if (currentObserver && !knownObservers.has(currentObserver)) {
-        const callback = currentObserver.notify;
-        const cleanupFn = () => {
-          dependents.delete(callback);
-          knownObservers.delete(currentObserver);
-        };
-        knownObservers.add(currentObserver);
-        dependents.add(callback);
-        currentObserver.cleanups.push(cleanupFn);
+        registerObserver(knownObservers, dependents, currentObserver);
       }
       return _value;
     },
@@ -41,18 +35,18 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
         return;
       }
       _value = newValue;
-      if (getBatchDepth() > 0) {
-        if (!_hasPrebatchValue) {
-          _preBatchValue = oldValue;
-          _hasPrebatchValue = true;
-        }
+      if (!_hasPrebatchValue) {
+        _preBatchValue = oldValue;
+        _hasPrebatchValue = true;
+      }
+      const notify = () => {
         getPendingNotifications().add(flushWatchers);
-        [...dependents].forEach((subscriber) => getPendingNotifications().add(subscriber));
+        dependents.forEach((subscriber) => getPendingNotifications().add(subscriber));
+      };
+      if (getBatchDepth() > 0) {
+        notify();
       } else {
-        batch(() => {
-          [...dependents].forEach((subscriber) => subscriber());
-          [...watchers].forEach((subscriber) => subscriber(newValue, oldValue));
-        });
+        batch(notify);
       }
     },
     peek() {

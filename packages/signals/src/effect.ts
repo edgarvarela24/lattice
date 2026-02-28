@@ -1,16 +1,16 @@
 // @lattice/signals — Effect
 import { getCurrentObserver, runWithObserver } from './observer';
-import type { Disposable, Effect } from './types.js';
+import { runCleanups } from './observer-utils';
+import type { Disposable, InternalEffect } from './types.js';
 
 export function effect(fn: () => void): Disposable {
-  let effect: Effect;
+  let effect: InternalEffect;
   effect = {
     active: true,
     dispose: () => {
       effect.children.forEach((child) => child.dispose());
       effect.children.clear();
-      effect.cleanups.forEach((cleanup) => cleanup());
-      effect.cleanups.length = 0;
+      runCleanups(effect.cleanups);
       effect.active = false;
     },
     cleanups: [],
@@ -19,8 +19,7 @@ export function effect(fn: () => void): Disposable {
       if (effect.active) {
         effect.children.forEach((child) => child.dispose());
         effect.children.clear();
-        effect.cleanups.forEach((cleanup) => cleanup());
-        effect.cleanups.length = 0;
+        runCleanups(effect.cleanups);
         runWithObserver(effect, fn);
       }
     },

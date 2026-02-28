@@ -1,4 +1,9 @@
-import type { Prettify } from '@lattice/utils';
+// types.ts — Public (what consumers see)
+export type Signal<T> = {
+  value: T;
+  peek(): T;
+  subscribe(cb: (newValue: T, oldValue: T) => void): () => void;
+};
 
 export type ReadonlySignal<T> = {
   readonly value: T;
@@ -6,27 +11,28 @@ export type ReadonlySignal<T> = {
   subscribe(cb: (newValue: T, oldValue: T) => void): () => void;
 };
 
-export type Signal<T> = Omit<ReadonlySignal<T>, 'value'> & {
-  value: T;
-};
-
-export type Computed<T> = ReadonlySignal<T> & Observer & { dirty: boolean; invalidate: () => void };
-
-export type SignalOptions<T> = Prettify<{
-  /** Custom equality function to determine if the value has changed. */
-  equals?: (a: T, b: T) => boolean;
-}>;
-
-export type Observer = {
-  /** List of cleanup functions to run */
-  cleanups: (() => void)[];
-  notify: () => void;
-  children: Set<Effect>;
-};
-
 export type Disposable = {
   dispose(): void;
-  active: boolean;
+  readonly active: boolean;
 };
 
-export type Effect = Disposable & Observer;
+export type SignalOptions<T> = {
+  equals?: (a: T, b: T) => boolean;
+};
+
+// internal-types.ts — What the implementation uses
+export type Observer = {
+  cleanups: (() => void)[];
+  notify: () => void;
+  children: Set<InternalEffect>;
+};
+
+export type InternalEffect = Omit<Disposable, 'active'> &
+  Observer & {
+    active: boolean;
+  };
+
+export type InternalComputed<T> = ReadonlySignal<T> &
+  Observer & {
+    dirty: boolean;
+  };

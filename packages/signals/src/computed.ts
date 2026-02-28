@@ -1,6 +1,7 @@
-import { getBatchDepth, getPendingNotifications } from './batch';
+import { batch, getBatchDepth, getPendingNotifications } from './batch';
 import { getCurrentObserver, runWithObserver } from './observer';
-import { Computed, ReadonlySignal, SignalOptions, Observer } from './types';
+import { registerObserver, runCleanups } from './observer-utils';
+import { InternalComputed, ReadonlySignal, SignalOptions, Observer } from './types';
 
 export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySignal<T> {
   const dependents = new Set<() => void>(); // observer notifies
@@ -8,11 +9,10 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
   const knownObservers = new WeakSet<Observer>();
   const equalityCheck = options?.equals ?? Object.is;
   let _value: T;
-  let computed: Computed<T>;
+  let computed: InternalComputed<T>;
 
   const evaluate = () => {
-    computed.cleanups.forEach((cleanup) => cleanup());
-    computed.cleanups.length = 0;
+    runCleanups(computed.cleanups);
     computed.dirty = false;
     _value = runWithObserver(computed, fn);
   };
@@ -28,36 +28,29 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
       }
       const currentObserver = getCurrentObserver();
       if (currentObserver && !knownObservers.has(currentObserver)) {
-        const callback = currentObserver.notify;
-        const cleanupFn = () => {
-          dependents.delete(callback);
-          knownObservers.delete(currentObserver);
-        };
-        knownObservers.add(currentObserver);
-        dependents.add(callback);
-        currentObserver.cleanups.push(cleanupFn);
+        registerObserver(knownObservers, dependents, currentObserver);
       }
       return _value;
     },
     dirty: false,
     cleanups: [],
     children: new Set(),
-    invalidate: () => {
+    notify: () => {
       computed.dirty = true;
       if (dependents.size > 0) {
         const oldValue = _value;
         evaluate();
         if (!equalityCheck(_value, oldValue)) {
+          const propagate = () => {
+            dependents.forEach((subscriber) => getPendingNotifications().add(subscriber));
+          };
           if (getBatchDepth() > 0) {
-            [...dependents].forEach((subscriber) => getPendingNotifications().add(subscriber));
+            propagate();
           } else {
-            [...dependents].forEach((subscriber) => subscriber());
+            batch(propagate);
           }
         }
       }
-    },
-    notify: () => {
-      computed.invalidate();
     },
     peek() {
       return _value;
