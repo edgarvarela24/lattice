@@ -1,9 +1,10 @@
 import { Tracker } from '../src/types.js';
 
 const trackers: Tracker[] = [];
+let isTracking = true;
 
 export function getCurrentTracker(): Tracker | undefined {
-  return trackers.at(-1);
+  return isTracking ? trackers.at(-1) : undefined;
 }
 
 export function runWithTracker<T>(tracker: Tracker, fn: () => T): T {
@@ -21,4 +22,14 @@ export function runWithTracker<T>(tracker: Tracker, fn: () => T): T {
   }
 
   return returnVal;
+}
+
+export function untracked<T>(fn: () => T): T {
+  const prev = isTracking;
+  isTracking = false;
+  try {
+    return fn();
+  } finally {
+    isTracking = prev;
+  }
 }

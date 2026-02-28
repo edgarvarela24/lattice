@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getCurrentTracker, runWithTracker } from '../src/tracking.js';
+import { getCurrentTracker, runWithTracker, untracked } from '../src/tracking.js';
 import { signal } from '../src/index.js';
 import type { Tracker } from '../src/types.js';
+import { computed } from '../src/computed.js';
+import { effect } from '../src/effect.js';
 
 function createTracker(): Tracker {
   return { cleanups: [], notify: () => null, children: new Set() };
@@ -306,5 +308,82 @@ describe('Signal + Tracker integration', () => {
       void s.value;
     });
     expect(tracker.cleanups).toHaveLength(1);
+  });
+
+  // --- Untracked ---
+
+  it('reading a signal inside untracked does not create a dependency', () => {
+    const tracker = createTracker();
+    const s = signal(0);
+    runWithTracker(tracker, () => {
+      untracked(() => {
+        void s.value;
+      });
+    });
+    expect(tracker.cleanups).toHaveLength(0);
+  });
+
+  it('reading a computed inside untracked does not create a dependency', () => {
+    const tracker = createTracker();
+    const s = signal(0);
+    const c = computed(() => s.value + 420);
+
+    runWithTracker(tracker, () => {
+      untracked(() => {
+        void c.value;
+      });
+    });
+    expect(tracker.cleanups).toHaveLength(0);
+  });
+
+  it('untracked returns the function result', () => {
+    const result = untracked(() => 42);
+    expect(result).toBe(42);
+  });
+
+  it("untracked inside an effect --- the untracked reads don't trigger re-reruns", () => {
+    const s = signal(0);
+    const fn = vi.fn(() => {
+      untracked(() => {
+        void s.value;
+      });
+    });
+    effect(fn);
+    expect(fn).toHaveBeenCalledTimes(1);
+    s.value = 5;
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('tracking resumes after untracked block', () => {
+    const s = signal(0);
+    const fn = vi.fn(() => {
+      untracked(() => {
+        void s.value; // not tracked
+      });
+      void s.value; // tracked
+    });
+
+    effect(fn);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    s.value = 1;
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('untracked works with computed — reads value but does not track', () => {
+    const s = signal(0);
+    const c = computed(() => s.value * 2);
+    const fn = vi.fn(() => {
+      untracked(() => {
+        void c.value;
+      });
+    });
+
+    effect(fn);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    s.value = 5;
+    expect(fn).toHaveBeenCalledTimes(1); // effect did not re-run
+    expect(c.value).toBe(10); // computed still works, just wasn't tracked
   });
 });
