@@ -10,14 +10,14 @@ export type Signal<T> = Omit<ReadonlySignal<T>, 'value'> & {
   value: T;
 };
 
-export type Computed<T> = ReadonlySignal<T> & Tracker & { dirty: boolean };
+export type Computed<T> = ReadonlySignal<T> & Observer & { dirty: boolean; invalidate: () => void };
 
 export type SignalOptions<T> = Prettify<{
   /** Custom equality function to determine if the value has changed. */
   equals?: (a: T, b: T) => boolean;
 }>;
 
-export type Tracker = {
+export type Observer = {
   /** List of cleanup functions to run */
   cleanups: (() => void)[];
   notify: () => void;
@@ -29,4 +29,4 @@ export type Disposable = {
   active: boolean;
 };
 
-export type Effect = Disposable & Tracker;
+export type Effect = Disposable & Observer;

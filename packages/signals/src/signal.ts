@@ -1,37 +1,37 @@
 import { batch, getBatchDepth, getPendingNotifications } from './batch.js';
-import { getCurrentTracker } from './tracking.js';
-import type { Signal, SignalOptions, Tracker } from './types.js';
+import { getCurrentObserver } from './observer.js';
+import type { Signal, SignalOptions, Observer } from './types.js';
 
 export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
-  const internalSubscribers = new Set<() => void>(); // tracker notifies
-  const publicSubscribers = new Set<(newValue: T, oldValue: T) => void>(); // .subscribe() callbacks
-  const trackers = new WeakSet<Tracker>();
+  const dependents = new Set<() => void>(); // observer notifies
+  const watchers = new Set<(newValue: T, oldValue: T) => void>(); // .subscribe() callbacks
+  const knownObservers = new WeakSet<Observer>();
   const equalityCheck = options?.equals ?? Object.is;
   let _value = initial;
   let _preBatchValue: T;
   let _hasPrebatchValue = false;
 
-  const flushPublicSubscribers = () => {
+  const flushWatchers = () => {
     if (_hasPrebatchValue && equalityCheck(_value, _preBatchValue)) {
       _hasPrebatchValue = false;
       return;
     }
     _hasPrebatchValue = false;
-    [...publicSubscribers].forEach((s) => s(_value, _preBatchValue));
+    [...watchers].forEach((s) => s(_value, _preBatchValue));
   };
 
   return {
     get value() {
-      const currentTracker = getCurrentTracker();
-      if (currentTracker && !trackers.has(currentTracker)) {
-        const callback = currentTracker.notify;
+      const currentObserver = getCurrentObserver();
+      if (currentObserver && !knownObservers.has(currentObserver)) {
+        const callback = currentObserver.notify;
         const cleanupFn = () => {
-          internalSubscribers.delete(callback);
-          trackers.delete(currentTracker);
+          dependents.delete(callback);
+          knownObservers.delete(currentObserver);
         };
-        trackers.add(currentTracker);
-        internalSubscribers.add(callback);
-        currentTracker.cleanups.push(cleanupFn);
+        knownObservers.add(currentObserver);
+        dependents.add(callback);
+        currentObserver.cleanups.push(cleanupFn);
       }
       return _value;
     },
@@ -46,12 +46,12 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
           _preBatchValue = oldValue;
           _hasPrebatchValue = true;
         }
-        getPendingNotifications().add(flushPublicSubscribers);
-        [...internalSubscribers].forEach((subscriber) => getPendingNotifications().add(subscriber));
+        getPendingNotifications().add(flushWatchers);
+        [...dependents].forEach((subscriber) => getPendingNotifications().add(subscriber));
       } else {
         batch(() => {
-          [...internalSubscribers].forEach((subscriber) => subscriber());
-          [...publicSubscribers].forEach((subscriber) => subscriber(newValue, oldValue));
+          [...dependents].forEach((subscriber) => subscriber());
+          [...watchers].forEach((subscriber) => subscriber(newValue, oldValue));
         });
       }
     },
@@ -59,8 +59,8 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
       return _value;
     },
     subscribe(callback) {
-      publicSubscribers.add(callback);
-      return () => publicSubscribers.delete(callback);
+      watchers.add(callback);
+      return () => watchers.delete(callback);
     },
   };
 }

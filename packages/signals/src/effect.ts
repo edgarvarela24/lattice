@@ -1,5 +1,5 @@
 // @lattice/signals — Effect
-import { getCurrentTracker, runWithTracker } from './tracking';
+import { getCurrentObserver, runWithObserver } from './observer';
 import type { Disposable, Effect } from './types.js';
 
 export function effect(fn: () => void): Disposable {
@@ -21,14 +21,14 @@ export function effect(fn: () => void): Disposable {
         effect.children.clear();
         effect.cleanups.forEach((cleanup) => cleanup());
         effect.cleanups.length = 0;
-        runWithTracker(effect, fn);
+        runWithObserver(effect, fn);
       }
     },
   };
-  runWithTracker(effect, fn);
-  const currentTracker = getCurrentTracker();
-  if (currentTracker) {
-    currentTracker.children.add(effect);
+  runWithObserver(effect, fn);
+  const currentObserver = getCurrentObserver();
+  if (currentObserver) {
+    currentObserver.children.add(effect);
   }
   return effect;
 }

@@ -1,11 +1,11 @@
 import { getBatchDepth, getPendingNotifications } from './batch';
-import { getCurrentTracker, runWithTracker } from './tracking';
-import { Computed, ReadonlySignal, SignalOptions, Tracker } from './types';
+import { getCurrentObserver, runWithObserver } from './observer';
+import { Computed, ReadonlySignal, SignalOptions, Observer } from './types';
 
 export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySignal<T> {
-  const internalSubscribers = new Set<() => void>(); // tracker notifies
-  const publicSubscribers = new Set<(newValue: T, oldValue: T) => void>(); // .subscribe() callbacks
-  const trackers = new WeakSet<Tracker>();
+  const dependents = new Set<() => void>(); // observer notifies
+  const watchers = new Set<(newValue: T, oldValue: T) => void>(); // .subscribe() callbacks
+  const knownObservers = new WeakSet<Observer>();
   const equalityCheck = options?.equals ?? Object.is;
   let _value: T;
   let computed: Computed<T>;
@@ -14,7 +14,7 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
     computed.cleanups.forEach((cleanup) => cleanup());
     computed.cleanups.length = 0;
     computed.dirty = false;
-    _value = runWithTracker(computed, fn);
+    _value = runWithObserver(computed, fn);
   };
 
   computed = {
@@ -23,49 +23,50 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
       if (computed.dirty) {
         evaluate();
         if (!equalityCheck(_value, oldValue)) {
-          [...publicSubscribers].forEach((subscriber) => subscriber(_value, oldValue));
+          [...watchers].forEach((subscriber) => subscriber(_value, oldValue));
         }
       }
-      const currentTracker = getCurrentTracker();
-      if (currentTracker && !trackers.has(currentTracker)) {
-        const callback = currentTracker.notify;
+      const currentObserver = getCurrentObserver();
+      if (currentObserver && !knownObservers.has(currentObserver)) {
+        const callback = currentObserver.notify;
         const cleanupFn = () => {
-          internalSubscribers.delete(callback);
-          trackers.delete(currentTracker);
+          dependents.delete(callback);
+          knownObservers.delete(currentObserver);
         };
-        trackers.add(currentTracker);
-        internalSubscribers.add(callback);
-        currentTracker.cleanups.push(cleanupFn);
+        knownObservers.add(currentObserver);
+        dependents.add(callback);
+        currentObserver.cleanups.push(cleanupFn);
       }
       return _value;
     },
     dirty: false,
     cleanups: [],
     children: new Set(),
-    notify: () => {
+    invalidate: () => {
       computed.dirty = true;
-      if (internalSubscribers.size > 0) {
+      if (dependents.size > 0) {
         const oldValue = _value;
         evaluate();
         if (!equalityCheck(_value, oldValue)) {
           if (getBatchDepth() > 0) {
-            [...internalSubscribers].forEach((subscriber) =>
-              getPendingNotifications().add(subscriber),
-            );
+            [...dependents].forEach((subscriber) => getPendingNotifications().add(subscriber));
           } else {
-            [...internalSubscribers].forEach((subscriber) => subscriber());
+            [...dependents].forEach((subscriber) => subscriber());
           }
         }
       }
+    },
+    notify: () => {
+      computed.invalidate();
     },
     peek() {
       return _value;
     },
     subscribe(callback) {
-      publicSubscribers.add(callback);
-      return () => publicSubscribers.delete(callback);
+      watchers.add(callback);
+      return () => watchers.delete(callback);
     },
   };
-  _value = runWithTracker(computed, fn);
+  _value = runWithObserver(computed, fn);
   return computed;
 }
