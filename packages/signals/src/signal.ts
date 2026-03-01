@@ -1,4 +1,4 @@
-import { batch, getBatchDepth, getPendingNotifications } from './batch.js';
+import { batch, isBatching, scheduleNotification } from './batch.js';
 import { registerObserver } from './observer-utils.js';
 import { getCurrentObserver } from './observer.js';
 import type { Signal, SignalOptions, Observer } from './types.js';
@@ -40,10 +40,10 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
         _hasPrebatchValue = true;
       }
       const notify = () => {
-        getPendingNotifications().add(flushWatchers);
-        dependents.forEach((subscriber) => getPendingNotifications().add(subscriber));
+        dependents.forEach((dependent) => scheduleNotification(dependent));
+        scheduleNotification(flushWatchers);
       };
-      if (getBatchDepth() > 0) {
+      if (isBatching()) {
         notify();
       } else {
         batch(notify);

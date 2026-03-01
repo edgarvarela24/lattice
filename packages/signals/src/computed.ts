@@ -1,4 +1,4 @@
-import { batch, getBatchDepth, getPendingNotifications } from './batch';
+import { batch, isBatching, scheduleNotification } from './batch';
 import { getCurrentObserver, runWithObserver } from './observer';
 import { registerObserver, runCleanups } from './observer-utils';
 import { InternalComputed, ReadonlySignal, SignalOptions, Observer } from './types';
@@ -37,14 +37,15 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
     children: new Set(),
     notify: () => {
       computed.dirty = true;
-      if (dependents.size > 0) {
+      if (dependents.size > 0 || watchers.size > 0) {
         const oldValue = _value;
         evaluate();
         if (!equalityCheck(_value, oldValue)) {
           const propagate = () => {
-            dependents.forEach((subscriber) => getPendingNotifications().add(subscriber));
+            dependents.forEach((dependent) => scheduleNotification(dependent));
+            scheduleNotification(() => [...watchers].forEach((w) => w(_value, oldValue)));
           };
-          if (getBatchDepth() > 0) {
+          if (isBatching()) {
             propagate();
           } else {
             batch(propagate);
