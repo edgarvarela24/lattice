@@ -16,6 +16,8 @@ export function runWithObserver<T>(observer: Observer, fn: () => T): T {
 
   try {
     returnVal = fn();
+  } catch (error) {
+    throw error;
   } finally {
     // Remove as current observer
     observerStack.pop();
