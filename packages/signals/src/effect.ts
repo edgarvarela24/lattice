@@ -1,34 +1,35 @@
 // @lattice/signals — Effect
-import { getCurrentTracker, runWithTracker } from './tracking';
-import type { Disposable, Effect } from './types.js';
+import { getCurrentObserver, runWithObserver } from './observer';
+import { runCleanups } from './observer-utils';
+import type { Disposable, InternalEffect } from './types.js';
 
 export function effect(fn: () => void): Disposable {
-  let effect: Effect;
+  const tearDown = () => {
+    effect.children.forEach((child) => child.dispose());
+    effect.children.clear();
+    runCleanups(effect.cleanups);
+  };
+
+  let effect: InternalEffect;
   effect = {
     active: true,
     dispose: () => {
-      effect.children.forEach((child) => child.dispose());
-      effect.children.clear();
-      effect.cleanups.forEach((cleanup) => cleanup());
-      effect.cleanups.length = 0;
+      tearDown();
       effect.active = false;
     },
     cleanups: [],
     children: new Set(),
     notify: () => {
       if (effect.active) {
-        effect.children.forEach((child) => child.dispose());
-        effect.children.clear();
-        effect.cleanups.forEach((cleanup) => cleanup());
-        effect.cleanups.length = 0;
-        runWithTracker(effect, fn);
+        tearDown();
+        runWithObserver(effect, fn);
       }
     },
   };
-  runWithTracker(effect, fn);
-  const currentTracker = getCurrentTracker();
-  if (currentTracker) {
-    currentTracker.children.add(effect);
+  runWithObserver(effect, fn);
+  const currentObserver = getCurrentObserver();
+  if (currentObserver) {
+    currentObserver.children.add(effect);
   }
   return effect;
 }

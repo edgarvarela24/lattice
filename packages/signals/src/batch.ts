@@ -1,27 +1,37 @@
 let batchDepth = 0;
-
+const MAX_ITERATIONS = 100;
 const pendingNotifications = new Set<() => void>();
 
-export const batch = (fn: () => void): void => {
+export function batch(fn: () => void): void {
   batchDepth++;
   try {
     fn();
   } finally {
     if (batchDepth === 1) {
-      while (pendingNotifications.size > 0) {
-        const queued = [...pendingNotifications];
-        pendingNotifications.clear();
-        queued.forEach((notification) => notification());
+      try {
+        let i = 0;
+        while (pendingNotifications.size > 0) {
+          if (++i >= MAX_ITERATIONS) {
+            pendingNotifications.clear();
+            throw new Error('Infinite reactive loop: batch flush exceeded 100 iterations');
+          }
+          const queued = [...pendingNotifications];
+          pendingNotifications.clear();
+          queued.forEach((notification) => notification());
+        }
+      } finally {
+        batchDepth--;
       }
+    } else {
+      batchDepth--;
     }
-    batchDepth--;
   }
-};
+}
 
-export const getBatchDepth = () => {
-  return batchDepth;
-};
+export function isBatching(): boolean {
+  return batchDepth > 0;
+}
 
-export const getPendingNotifications = () => {
-  return pendingNotifications;
-};
+export function scheduleNotification(fn: () => void): void {
+  pendingNotifications.add(fn);
+}

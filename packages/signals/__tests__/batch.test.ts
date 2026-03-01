@@ -480,6 +480,49 @@ describe('batch', () => {
     expect(s.peek()).toBe(3);
   });
 
+  it('throws when batch flush exceeds max iterations (infinite reactive loop)', () => {
+    const s = signal(0);
+    let armed = false;
+
+    effect(() => {
+      const val = s.value;
+      if (armed) {
+        s.value = val + 1;
+      }
+    });
+
+    armed = true;
+
+    expect(() => {
+      batch(() => {
+        s.value = 100;
+      });
+    }).toThrow(/infinite/i);
+  });
+
+  it('signal writes work normally after a flush limit error', () => {
+    const s = signal(0);
+    let armed = false;
+
+    effect(() => {
+      const val = s.value;
+      if (armed) s.value = val + 1;
+    });
+
+    armed = true;
+    try {
+      batch(() => {
+        s.value = 100;
+      });
+    } catch {}
+
+    armed = false;
+    const fn = vi.fn();
+    s.subscribe(fn);
+    s.value = 5;
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   // -----------------------------------------------------------------------
   // Signal writes during flush (re-entrant writes)
   // -----------------------------------------------------------------------

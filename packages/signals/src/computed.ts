@@ -1,20 +1,20 @@
-import { getBatchDepth, getPendingNotifications } from './batch';
-import { getCurrentTracker, runWithTracker } from './tracking';
-import { Computed, ReadonlySignal, SignalOptions, Tracker } from './types';
+import { batch, isBatching, scheduleNotification } from './batch';
+import { getCurrentObserver, runWithObserver } from './observer';
+import { registerObserver, runCleanups } from './observer-utils';
+import { InternalComputed, ReadonlySignal, SignalOptions, Observer } from './types';
 
 export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySignal<T> {
-  const internalSubscribers = new Set<() => void>(); // tracker notifies
-  const publicSubscribers = new Set<(newValue: T, oldValue: T) => void>(); // .subscribe() callbacks
-  const trackers = new WeakSet<Tracker>();
+  const dependents = new Set<() => void>(); // observer notifies
+  const watchers = new Set<(newValue: T, oldValue: T) => void>(); // .subscribe() callbacks
+  const knownObservers = new WeakSet<Observer>();
   const equalityCheck = options?.equals ?? Object.is;
   let _value: T;
-  let computed: Computed<T>;
+  let computed: InternalComputed<T>;
 
   const evaluate = () => {
-    computed.cleanups.forEach((cleanup) => cleanup());
-    computed.cleanups.length = 0;
+    runCleanups(computed.cleanups);
     computed.dirty = false;
-    _value = runWithTracker(computed, fn);
+    _value = runWithObserver(computed, fn);
   };
 
   computed = {
@@ -23,19 +23,12 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
       if (computed.dirty) {
         evaluate();
         if (!equalityCheck(_value, oldValue)) {
-          [...publicSubscribers].forEach((subscriber) => subscriber(_value, oldValue));
+          [...watchers].forEach((subscriber) => subscriber(_value, oldValue));
         }
       }
-      const currentTracker = getCurrentTracker();
-      if (currentTracker && !trackers.has(currentTracker)) {
-        const callback = currentTracker.notify;
-        const cleanupFn = () => {
-          internalSubscribers.delete(callback);
-          trackers.delete(currentTracker);
-        };
-        trackers.add(currentTracker);
-        internalSubscribers.add(callback);
-        currentTracker.cleanups.push(cleanupFn);
+      const currentObserver = getCurrentObserver();
+      if (currentObserver && !knownObservers.has(currentObserver)) {
+        registerObserver(knownObservers, dependents, currentObserver);
       }
       return _value;
     },
@@ -44,16 +37,18 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
     children: new Set(),
     notify: () => {
       computed.dirty = true;
-      if (internalSubscribers.size > 0) {
+      if (dependents.size > 0 || watchers.size > 0) {
         const oldValue = _value;
         evaluate();
         if (!equalityCheck(_value, oldValue)) {
-          if (getBatchDepth() > 0) {
-            [...internalSubscribers].forEach((subscriber) =>
-              getPendingNotifications().add(subscriber),
-            );
+          const propagate = () => {
+            dependents.forEach((dependent) => scheduleNotification(dependent));
+            scheduleNotification(() => [...watchers].forEach((w) => w(_value, oldValue)));
+          };
+          if (isBatching()) {
+            propagate();
           } else {
-            [...internalSubscribers].forEach((subscriber) => subscriber());
+            batch(propagate);
           }
         }
       }
@@ -62,10 +57,10 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
       return _value;
     },
     subscribe(callback) {
-      publicSubscribers.add(callback);
-      return () => publicSubscribers.delete(callback);
+      watchers.add(callback);
+      return () => watchers.delete(callback);
     },
   };
-  _value = runWithTracker(computed, fn);
+  _value = runWithObserver(computed, fn);
   return computed;
 }
