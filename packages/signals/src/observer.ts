@@ -1,6 +1,8 @@
-import { Observer } from './types.js';
+import { Observer, ReactiveSource } from './types.js';
 
 const observerStack: Observer[] = [];
+const dependencyStack: Map<ReactiveSource, number>[] = [];
+
 let isTracking = true;
 
 export function getCurrentObserver(): Observer | undefined {
@@ -33,5 +35,22 @@ export function untracked<T>(fn: () => T): T {
     return fn();
   } finally {
     isTracking = prev;
+  }
+}
+
+export function startTrackingDependents(): Map<ReactiveSource, number> {
+  const deps = new Map<ReactiveSource, number>();
+  dependencyStack.push(deps);
+  return deps;
+}
+
+export function stopTrackingDependents(): void {
+  dependencyStack.pop();
+}
+
+export function trackDependency(source: ReactiveSource): void {
+  const dependency = dependencyStack.at(-1);
+  if (dependency && !dependency.has(source)) {
+    dependency.set(source, source._version);
   }
 }

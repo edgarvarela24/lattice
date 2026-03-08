@@ -1,9 +1,13 @@
 let batchDepth = 0;
+let flushId: string;
+
 const MAX_ITERATIONS = 100;
 const pendingNotifications = new Set<() => void>();
 
 export function batch(fn: () => void): void {
   batchDepth++;
+  flushId = crypto.randomUUID();
+
   try {
     fn();
   } finally {
@@ -30,6 +34,10 @@ export function batch(fn: () => void): void {
 
 export function isBatching(): boolean {
   return batchDepth > 0;
+}
+
+export function getFlushId(): string {
+  return flushId;
 }
 
 export function scheduleNotification(fn: () => void): void {

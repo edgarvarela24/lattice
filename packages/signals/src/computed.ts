@@ -1,5 +1,5 @@
-import { batch, isBatching, scheduleNotification } from './batch';
-import { getCurrentObserver, runWithObserver } from './observer';
+import { batch, getFlushId, isBatching, scheduleNotification } from './batch';
+import { getCurrentObserver, runWithObserver, trackDependency } from './observer';
 import { registerObserver, runCleanups } from './observer-utils';
 import { InternalComputed, ReadonlySignal, SignalOptions, Observer } from './types';
 
@@ -13,6 +13,9 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
   let computed: InternalComputed<T>;
   let _error: unknown;
   let _hasError: boolean;
+  let _isEvaluating: boolean;
+  let _currentFlushId: string | undefined;
+  let _version = 0;
 
   const setValueOrError = () => {
     try {
@@ -25,13 +28,29 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
   };
 
   const evaluate = () => {
+    if (_isEvaluating) {
+      _hasError = true;
+      _error = new Error('Circular dependency detected. Computed reading itself');
+      _isEvaluating = false;
+      return;
+    }
+    _isEvaluating = true;
+    const oldValue = _value;
     runCleanups(computed.cleanups);
-    computed.dirty = false;
     setValueOrError();
+    computed.dirty = false;
+    _isEvaluating = false;
+    if (!_hasError && !equalityCheck(_value, oldValue)) {
+      _version++;
+    }
   };
 
   computed = {
+    get _version() {
+      return _version;
+    },
     get value() {
+      trackDependency(computed);
       const currentObserver = getCurrentObserver();
       if (currentObserver && !knownObservers.has(currentObserver)) {
         registerObserver(knownObservers, dependents, currentObserver);
@@ -53,29 +72,39 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
       return _value;
     },
     notify: () => {
+      if (computed.dirty) return; // already dirty — stops cycles in propagation
       computed.dirty = true;
+
       if (dependents.size === 0 && watchers.size === 0) return;
 
-      const oldValue = _value;
-      evaluate();
-
-      const valueChanged = !_hasError && !equalityCheck(_value, oldValue);
-
-      // Nothing to propagate: no error and value is the same
-      if (!_hasError && !valueChanged) return;
-
       const propagate = () => {
-        dependents.forEach((dependent) => scheduleNotification(dependent));
-        if (valueChanged) {
-          scheduleNotification(() => [...watchers].forEach((w) => w(_value, oldValue)));
+        // Propagate dirtiness FIRST — before any evaluation
+        dependents.forEach((dep) => scheduleNotification(dep));
+
+        // Only schedule evaluation if watchers need push notification
+        if (watchers.size > 0) {
+          scheduleNotification(() => {
+            const currentFlushId = getFlushId();
+            if (currentFlushId === _currentFlushId) {
+              _hasError = true;
+              _error = new Error('Circular dependency detected!');
+              _currentFlushId = undefined;
+              computed.dirty = false;
+              return;
+            }
+            _currentFlushId = currentFlushId;
+            const oldValue = _value;
+            evaluate();
+            const valueChanged = !equalityCheck(_value, oldValue);
+            if (!_hasError && !valueChanged) return;
+            if (valueChanged && watchers.size) {
+              [...watchers].forEach((w) => w(_value, oldValue));
+            }
+          });
         }
       };
-
-      if (isBatching()) {
-        propagate();
-      } else {
-        batch(propagate);
-      }
+      if (isBatching()) propagate();
+      else batch(propagate);
     },
     peek() {
       return _value;

@@ -27,6 +27,10 @@ export type Observer = {
   children: Set<InternalEffect>;
 };
 
+export type InternalSignal<T> = Signal<T> & {
+  readonly _version: number;
+};
+
 export type InternalEffect = Omit<Disposable, 'active'> &
   Observer & {
     active: boolean;
@@ -35,4 +39,10 @@ export type InternalEffect = Omit<Disposable, 'active'> &
 export type InternalComputed<T> = ReadonlySignal<T> &
   Observer & {
     dirty: boolean;
+    _version: number;
   };
+
+export type ReactiveSource = {
+  readonly value: unknown;
+  readonly _version: number;
+};
