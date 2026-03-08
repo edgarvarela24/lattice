@@ -1,21 +1,10 @@
-import { runCleanups } from './observer-utils';
-import { Owner } from './types';
+import { OwnerImpl } from './owner-impl.js';
+import type { Owner } from './types.js';
 
 const ownerStack: Owner[] = [];
 
 export function createOwner(): Owner {
-  let owner: Owner;
-  owner = {
-    active: true,
-    cleanups: [],
-    children: new Set(),
-    dispose: function () {
-      owner.children.forEach((child) => child.dispose());
-      owner.children.clear();
-      runCleanups(owner.cleanups);
-      owner.active = false;
-    },
-  };
+  const owner = new OwnerImpl();
   const currentOwner = getCurrentOwner();
   if (currentOwner) {
     currentOwner.children.add(owner);

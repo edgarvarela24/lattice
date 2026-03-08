@@ -1,7 +1,7 @@
 import { Observer, ReactiveSource } from './types.js';
 
 const observerStack: Observer[] = [];
-const dependencyStack: Map<ReactiveSource, number>[] = [];
+const sourceStack: Map<ReactiveSource, number>[] = [];
 
 let isTracking = true;
 
@@ -10,18 +10,13 @@ export function getCurrentObserver(): Observer | undefined {
 }
 
 export function runWithObserver<T>(observer: Observer, fn: () => T): T {
-  // Make observer current for duration of function
   observerStack.push(observer);
 
-  // Execute fn in try/finally to restore previous observer even if fn throws error
   let returnVal;
 
   try {
     returnVal = fn();
-  } catch (error) {
-    throw error;
   } finally {
-    // Remove as current observer
     observerStack.pop();
   }
 
@@ -38,19 +33,19 @@ export function untracked<T>(fn: () => T): T {
   }
 }
 
-export function startTrackingDependents(): Map<ReactiveSource, number> {
+export function startTrackingSources(): Map<ReactiveSource, number> {
   const deps = new Map<ReactiveSource, number>();
-  dependencyStack.push(deps);
+  sourceStack.push(deps);
   return deps;
 }
 
-export function stopTrackingDependents(): void {
-  dependencyStack.pop();
+export function stopTrackingSources(): void {
+  sourceStack.pop();
 }
 
-export function trackDependency(source: ReactiveSource): void {
-  const dependency = dependencyStack.at(-1);
-  if (dependency && !dependency.has(source)) {
-    dependency.set(source, source._version);
+export function trackSource(source: ReactiveSource): void {
+  const s = sourceStack.at(-1);
+  if (s && !s.has(source)) {
+    s.set(source, source._version);
   }
 }

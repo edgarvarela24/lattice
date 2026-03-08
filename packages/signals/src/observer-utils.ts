@@ -1,17 +1,17 @@
-import { Observer } from './types';
+import { Observer } from './types.js';
 
 export function registerObserver(
   knownObservers: WeakSet<Observer>,
-  dependents: Set<() => void>,
+  listeners: Set<() => void>,
   observer: Observer,
 ): void {
   const callback = observer.notify;
   const cleanup = () => {
-    dependents.delete(callback);
+    listeners.delete(callback);
     knownObservers.delete(observer);
   };
   knownObservers.add(observer);
-  dependents.add(callback);
+  listeners.add(callback);
   observer.cleanups.push(cleanup);
 }
 

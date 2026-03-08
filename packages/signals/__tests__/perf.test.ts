@@ -391,4 +391,16 @@ describe('performance baselines', () => {
     console.log('  Compare against Phase 2 (deep reactivity) to measure overhead.');
     console.log('  ────────────────────────────────────────\n');
   });
+
+  it('memory: 10,000 signals', () => {
+    global.gc!();
+    const before = process.memoryUsage().heapUsed;
+    const signals = Array.from({ length: 10_000 }, (_, i) => signal(i));
+    global.gc!();
+    const after = process.memoryUsage().heapUsed;
+    const perSignal = (after - before) / 10_000;
+    console.log(`  Memory per signal: ${perSignal.toFixed(0)} bytes`);
+    // Keep reference alive so GC doesn't collect
+    expect(signals.length).toBe(10_000);
+  });
 });
