@@ -13,4 +13,4 @@ export { untracked } from './observer.js';
 export { createOwner, runWithOwner } from './owner.js';
 
 // Types
-export type { Signal, ReadonlySignal, Disposable, SignalOptions } from './types';
+export type { Signal, ReadonlySignal, Disposable, SignalOptions } from './types.js';

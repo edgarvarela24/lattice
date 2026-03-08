@@ -69,12 +69,23 @@ Compare these numbers against Phase 2 (deep reactivity) to measure proxy overhea
 | ----------------------------------------- | ------- | --------------- |
 | 10k writes, computed stable, effect skips | 22.33ms | 447,748 ops/sec |
 
+## Memory Per Instance
+
+| Primitive | Closure (before) | Class (after) | Reduction |
+| --------- | ---------------- | ------------- | --------- |
+| Signal    | 1,416 bytes      | 537 bytes     | 2.6x      |
+| Computed  | —                | —             | —         |
+| Effect    | —                | —             | —         |
+
+Fill in computed and effect rows after class migration is complete.
+
 ---
 
 ## Notes
 
 - **Reads (13M ops/sec)** are the hot path for templates. In good shape.
-- **Writes without observers (1.1M ops/sec)** incur batch overhead even with no listeners. A fast path skipping batch when `dependents.size === 0` could help.
+- **Writes without observers (1.1M ops/sec)** incur batch overhead even with no listeners. A fast path skipping batch when `listeners.size === 0` could help.
 - **Diamond 1→1000→1 (206ms)** is the slowest benchmark. Topological sorting in Phase 2 should improve this significantly.
 - **Version check payoff is real** — 10k writes where the computed value didn't change resulted in zero effect re-runs.
 - **Batching works well** — 10k writes batched into a single effect run in 3ms.
+- **Class migration reduced signal memory by 2.6x.** At 10k signals: 14MB → 5MB. Expect similar reductions for computed and effect.
