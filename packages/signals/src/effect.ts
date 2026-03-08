@@ -6,7 +6,8 @@ import {
   stopTrackingDependents,
 } from './observer';
 import { runCleanups } from './observer-utils';
-import type { Disposable, InternalEffect, ReactiveSource } from './types.js';
+import { getCurrentOwner } from './owner';
+import type { Disposable, InternalEffect, Owner, ReactiveSource } from './types.js';
 
 export function effect(fn: () => void): Disposable {
   let _dependents: Map<ReactiveSource, number>;
@@ -20,7 +21,8 @@ export function effect(fn: () => void): Disposable {
   const run = () => {
     _dependents = startTrackingDependents();
     try {
-      runWithObserver(effect, fn);
+      const returnVal = runWithObserver(effect, fn);
+      if (typeof returnVal === 'function') effect.cleanups.push(returnVal);
     } finally {
       stopTrackingDependents();
     }
@@ -64,6 +66,12 @@ export function effect(fn: () => void): Disposable {
   const currentObserver = getCurrentObserver();
   if (currentObserver) {
     currentObserver.children.add(effect);
+  } else {
+    const currentOwner = getCurrentOwner();
+    if (currentOwner) {
+      currentOwner.children.add(effect);
+    }
   }
+
   return effect;
 }
