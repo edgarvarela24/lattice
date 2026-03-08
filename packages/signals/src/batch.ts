@@ -1,7 +1,7 @@
 let batchDepth = 0;
 let flushId: string;
 
-const MAX_ITERATIONS = 100;
+const MAX_ITERATIONS = 10_000;
 const pendingNotifications = new Set<() => void>();
 
 export function batch(fn: () => void): void {
