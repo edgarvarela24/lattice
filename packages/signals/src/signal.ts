@@ -1,7 +1,7 @@
 import { batch, isBatching, scheduleNotification } from './batch.js';
 import { registerObserver } from './observer-utils.js';
-import { getCurrentObserver } from './observer.js';
-import type { Signal, SignalOptions, Observer } from './types.js';
+import { getCurrentObserver, trackDependency } from './observer.js';
+import type { Signal, SignalOptions, Observer, InternalSignal } from './types.js';
 
 export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
   const dependents = new Set<() => void>(); // observer notifies
@@ -11,6 +11,7 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
   let _value = initial;
   let _preBatchValue: T;
   let _hasPrebatchValue = false;
+  let _version = 0;
 
   const flushWatchers = () => {
     if (_hasPrebatchValue && equalityCheck(_value, _preBatchValue)) {
@@ -21,8 +22,11 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
     [...watchers].forEach((s) => s(_value, _preBatchValue));
   };
 
-  return {
+  let signal: InternalSignal<T>;
+
+  signal = {
     get value() {
+      trackDependency(signal);
       const currentObserver = getCurrentObserver();
       if (currentObserver && !knownObservers.has(currentObserver)) {
         registerObserver(knownObservers, dependents, currentObserver);
@@ -31,18 +35,24 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
     },
     set value(newValue: T) {
       const oldValue = _value;
+
       if (equalityCheck(newValue, oldValue)) {
         return;
       }
+
       _value = newValue;
+      _version++;
+
       if (!_hasPrebatchValue) {
         _preBatchValue = oldValue;
         _hasPrebatchValue = true;
       }
+
       const notify = () => {
         dependents.forEach((dependent) => scheduleNotification(dependent));
         scheduleNotification(flushWatchers);
       };
+
       if (isBatching()) {
         notify();
       } else {
@@ -56,5 +66,9 @@ export function signal<T>(initial: T, options?: SignalOptions<T>): Signal<T> {
       watchers.add(callback);
       return () => watchers.delete(callback);
     },
+    get _version() {
+      return _version;
+    },
   };
+  return signal;
 }
