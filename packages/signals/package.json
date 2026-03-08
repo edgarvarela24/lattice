@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "description": "Fine-grained signal primitives, computed signals, effects, batching, and ownership",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./internals": {
+      "types": "./dist/internals.d.ts",
+      "import": "./dist/internals.js",
+      "default": "./dist/internals.js"
     }
   },
   "files": [
@@ -17,12 +21,10 @@
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run",
+    "test:gc": "vitest run --pool forks --poolOptions.forks.execArgv=--expose-gc",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist *.tsbuildinfo"
-  },
-  "dependencies": {
-    "@lattice/utils": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
