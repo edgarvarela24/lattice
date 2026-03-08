@@ -113,6 +113,13 @@ export function computed<T>(fn: () => T, options?: SignalOptions<T>): ReadonlySi
       watchers.add(callback);
       return () => watchers.delete(callback);
     },
+    dispose() {
+      runCleanups(computed.cleanups);
+      computed.children.forEach((child) => child.dispose());
+      computed.children.clear();
+      computed.active = false;
+    },
+    active: true,
     dirty: false,
     cleanups: [],
     children: new Set(),
