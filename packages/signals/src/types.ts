@@ -21,20 +21,22 @@ export type SignalOptions<T> = {
 };
 
 // internal-types.ts — What the implementation uses
-export type Observer = {
+export type Owner = {
+  active: boolean;
   cleanups: (() => void)[];
+  children: Set<Owner>;
+  dispose(): void;
+};
+
+export type Observer = Owner & {
   notify: () => void;
-  children: Set<InternalEffect>;
 };
 
 export type InternalSignal<T> = Signal<T> & {
   readonly _version: number;
 };
 
-export type InternalEffect = Omit<Disposable, 'active'> &
-  Observer & {
-    active: boolean;
-  };
+export type InternalEffect = Observer;
 
 export type InternalComputed<T> = ReadonlySignal<T> &
   Observer & {
