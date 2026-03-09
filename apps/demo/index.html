@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lattice Signals — Reactive Engine Demo</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0f1117;
+        --surface: #1a1d27;
+        --surface-alt: #222632;
+        --border: #2e3345;
+        --text: #e2e4ed;
+        --text-dim: #8b8fa3;
+        --accent: #6c8cff;
+        --accent-dim: #4a5f99;
+        --green: #4cda8a;
+        --red: #f06060;
+        --orange: #e8a340;
+        --yellow: #f0d060;
+        --radius: 8px;
+        --panel-gap: 16px;
+      }
+
+      body {
+        font-family:
+          'Inter',
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+        min-height: 100vh;
+      }
+
+      header {
+        text-align: center;
+        padding: 32px 24px 8px;
+      }
+
+      header h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, var(--accent), #a87cff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      header p {
+        color: var(--text-dim);
+        font-size: 0.9rem;
+        margin-top: 4px;
+      }
+
+      #app {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--panel-gap);
+        padding: 20px 24px 32px;
+        max-width: 1440px;
+        margin: 0 auto;
+      }
+
+      /* Panels 4 & 5 span the bottom row */
+      #app > :nth-child(4) {
+        grid-column: 1 / 2;
+      }
+      #app > :nth-child(5) {
+        grid-column: 2 / 4;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .panel-title {
+        font-size: 1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .panel-title .badge {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .panel-desc {
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        line-height: 1.4;
+      }
+
+      .stat {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: var(--text-dim);
+      }
+
+      .stat-value {
+        font-weight: 600;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .stats-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        background: var(--accent-dim);
+        color: var(--text);
+        border: 1px solid var(--accent);
+        padding: 6px 14px;
+        border-radius: var(--radius);
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          transform 0.1s;
+      }
+
+      button:hover {
+        background: var(--accent);
+      }
+
+      button:active {
+        transform: scale(0.97);
+      }
+
+      button.danger {
+        background: #5a2020;
+        border-color: var(--red);
+      }
+
+      button.danger:hover {
+        background: var(--red);
+      }
+
+      button.secondary {
+        background: var(--surface-alt);
+        border-color: var(--border);
+      }
+
+      button.secondary:hover {
+        background: var(--border);
+      }
+
+      /* ---------- Grid Panel ---------- */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 3px;
+      }
+
+      .grid-cell {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--surface-alt);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.08s;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .grid-cell:hover {
+        border-color: var(--accent);
+      }
+
+      @keyframes cell-flash {
+        0% {
+          background: var(--accent);
+          color: #fff;
+        }
+        100% {
+          background: var(--surface-alt);
+        }
+      }
+
+      .grid-cell.flash {
+        animation: cell-flash 0.45s ease-out;
+      }
+
+      /* ---------- Version Skip ---------- */
+      input[type='range'] {
+        width: 100%;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      .vs-display {
+        display: flex;
+        gap: 24px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .vs-value {
+        font-size: 2rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        min-width: 60px;
+        text-align: center;
+      }
+
+      /* ---------- Ownership ---------- */
+      .widgets-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-height: 40px;
+      }
+
+      .widget-box {
+        background: var(--surface-alt);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.8rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .widget-box .timer {
+        font-weight: 600;
+        color: var(--green);
+        min-width: 28px;
+        text-align: right;
+      }
+
+      .widget-box button {
+        padding: 2px 8px;
+        font-size: 0.7rem;
+      }
+
+      /* ---------- Batching ---------- */
+      .event-log {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 10px;
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        font-size: 0.72rem;
+        line-height: 1.6;
+        max-height: 180px;
+        overflow-y: auto;
+        color: var(--text-dim);
+      }
+
+      .event-log .entry {
+        display: block;
+      }
+
+      .event-log .ts {
+        color: var(--accent);
+      }
+
+      .buttons-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      /* ---------- Diamond ---------- */
+      .diamond-values {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .diamond-var {
+        text-align: center;
+      }
+
+      .diamond-var .label {
+        font-size: 0.7rem;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .diamond-var .val {
+        font-size: 1.5rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .glitch-counter {
+        font-size: 1.2rem;
+        font-weight: 700;
+      }
+
+      .glitch-counter.zero {
+        color: var(--green);
+      }
+      .glitch-counter.nonzero {
+        color: var(--red);
+      }
+
+      /* ---------- Responsive ---------- */
+      @media (max-width: 1024px) {
+        #app {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        #app > :nth-child(4) {
+          grid-column: auto;
+        }
+        #app > :nth-child(5) {
+          grid-column: auto;
+        }
+      }
+
+      @media (max-width: 640px) {
+        #app {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Lattice Signals — Reactive Engine Demo</h1>
+      <p>
+        Five proofs that fine-grained reactivity works. No framework — just signals and the DOM.
+      </p>
+    </header>
+
+    <div id="app"></div>
+
+    <script type="module">
+      import {
+        signal,
+        computed,
+        effect,
+        batch,
+        untracked,
+        createOwner,
+        runWithOwner,
+      } from './signals.js';
+
+      // ─── Helpers ──────────────────────────────────────────────
+
+      function el(tag, attrs = {}, ...children) {
+        const e = document.createElement(tag);
+        for (const [k, v] of Object.entries(attrs)) {
+          if (k === 'class') e.className = v;
+          else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+          else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+          else e.setAttribute(k, v);
+        }
+        for (const c of children) {
+          if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+          else if (c) e.appendChild(c);
+        }
+        return e;
+      }
+
+      function panel(title, badge, badgeColor, desc, ...content) {
+        const b = el('span', { class: 'badge', style: { background: badgeColor } }, badge);
+        const heading = el('div', { class: 'panel-title' }, title + ' ', b);
+        const p = el('div', { class: 'panel-desc' }, desc);
+        return el('div', { class: 'panel' }, heading, p, ...content);
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // PANEL 1 — Fine-Grained Grid
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      function createGridPanel() {
+        const domUpdates = signal(0);
+        const grid = el('div', { class: 'grid' });
+        const statsVal = el('span', { class: 'stat-value' }, '0');
+        const statsRow = el(
+          'div',
+          { class: 'stats-row' },
+          el('span', { class: 'stat' }, 'DOM updates: ', statsVal),
+        );
+
+        effect(() => {
+          statsVal.textContent = String(domUpdates.value);
+        });
+
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 10; c++) {
+            const cellSignal = signal(0);
+            const cell = el(
+              'div',
+              {
+                class: 'grid-cell',
+                onclick: () => {
+                  cellSignal.value++;
+                },
+              },
+              '0',
+            );
+
+            effect(() => {
+              const v = cellSignal.value;
+              cell.textContent = String(v);
+              if (v > 0) {
+                domUpdates.value = domUpdates.peek() + 1;
+                cell.classList.remove('flash');
+                // Force reflow so re-adding the class restarts the animation
+                void cell.offsetWidth;
+                cell.classList.add('flash');
+              }
+            });
+
+            cell.addEventListener('animationend', () => {
+              cell.classList.remove('flash');
+            });
+
+            grid.appendChild(cell);
+          }
+        }
+
+        return panel(
+          'Fine-Grained Grid',
+          'precision',
+          '#2a5a3a',
+          'Click any cell — only that cell updates. The counter proves it increments by 1, not 100.',
+          grid,
+          statsRow,
+        );
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // PANEL 2 — Version Skip
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      function createVersionSkipPanel() {
+        const raw = signal(0);
+        const clamped = computed(() => Math.min(raw.value, 50));
+        const signalWrites = signal(0);
+        const effectRuns = signal(0);
+
+        const slider = el('input', {
+          type: 'range',
+          min: '0',
+          max: '100',
+          value: '0',
+          oninput: (e) => {
+            raw.value = Number(e.target.value);
+            signalWrites.value++;
+          },
+        });
+
+        const rawDisplay = el('span', { class: 'vs-value' }, '0');
+        const clampedDisplay = el(
+          'span',
+          { class: 'vs-value', style: { color: 'var(--green)' } },
+          '0',
+        );
+        const writesDisplay = el('span', { class: 'stat-value' }, '0');
+        const runsDisplay = el('span', { class: 'stat-value' }, '0');
+
+        effect(() => {
+          rawDisplay.textContent = String(raw.value);
+        });
+
+        effect(() => {
+          clampedDisplay.textContent = String(clamped.value);
+          effectRuns.value = effectRuns.peek() + 1;
+        });
+
+        effect(() => {
+          writesDisplay.textContent = String(signalWrites.value);
+        });
+        effect(() => {
+          runsDisplay.textContent = String(effectRuns.value);
+        });
+
+        const display = el(
+          'div',
+          { class: 'vs-display' },
+          el(
+            'div',
+            {},
+            el('div', { style: { fontSize: '0.7rem', color: 'var(--text-dim)' } }, 'RAW'),
+            rawDisplay,
+          ),
+          el(
+            'div',
+            {},
+            el(
+              'div',
+              { style: { fontSize: '0.7rem', color: 'var(--text-dim)' } },
+              'CLAMPED (max 50)',
+            ),
+            clampedDisplay,
+          ),
+        );
+
+        const stats = el(
+          'div',
+          { class: 'stats-row' },
+          el('span', { class: 'stat' }, 'Signal writes: ', writesDisplay),
+          el('span', { class: 'stat' }, 'Effect runs: ', runsDisplay),
+        );
+
+        return panel(
+          'Version Skip',
+          'skip',
+          '#5a4a20',
+          'Drag past 50 — the signal keeps changing but the computed stays at 50. The effect stops re-running.',
+          slider,
+          display,
+          stats,
+        );
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // PANEL 3 — Ownership & Disposal
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      function createOwnershipPanel() {
+        let parentOwner = createOwner();
+        const widgetCount = signal(0);
+        const effectCount = signal(0);
+        const container = el('div', { class: 'widgets-container' });
+
+        // Map owner → { box element, cleanup for destroy }
+        const widgetMap = new Map();
+
+        const countDisplay = el('span', { class: 'stat-value' }, '0');
+        const effectDisplay = el('span', { class: 'stat-value' }, '0');
+
+        effect(() => {
+          countDisplay.textContent = String(widgetCount.value);
+        });
+        effect(() => {
+          effectDisplay.textContent = String(effectCount.value);
+        });
+
+        function spawnWidget() {
+          const owner = createOwner();
+          // Register child under parent so "Destroy All" cascades
+          parentOwner.children.add(owner);
+
+          const timer = signal(0);
+          const box = el('div', { class: 'widget-box' });
+          const timerEl = el('span', { class: 'timer' }, '0');
+          const destroyBtn = el(
+            'button',
+            {
+              class: 'danger',
+              onclick: () => destroyWidget(owner),
+            },
+            '✕',
+          );
+
+          box.appendChild(el('span', {}, 'Widget'));
+          box.appendChild(timerEl);
+          box.appendChild(destroyBtn);
+
+          let intervalId = null;
+
+          let effectsForWidget = 0;
+
+          runWithOwner(owner, () => {
+            // Effect 1: tick the timer via setInterval
+            effect(() => {
+              intervalId = setInterval(() => {
+                timer.value++;
+              }, 1000);
+              return () => {
+                clearInterval(intervalId);
+              };
+            });
+
+            // Effect 2: render timer value
+            effect(() => {
+              timerEl.textContent = String(timer.value);
+            });
+          });
+
+          effectsForWidget = 2;
+          effectCount.value = effectCount.peek() + effectsForWidget;
+
+          // When owner is disposed, decrement effect count
+          owner.cleanups.push(() => {
+            effectCount.value = effectCount.peek() - effectsForWidget;
+          });
+
+          widgetCount.value++;
+          widgetMap.set(owner, box);
+          container.appendChild(box);
+        }
+
+        function destroyWidget(owner) {
+          owner.dispose();
+          parentOwner.children.delete(owner);
+          const box = widgetMap.get(owner);
+          if (box) {
+            box.remove();
+            widgetMap.delete(owner);
+          }
+          widgetCount.value--;
+        }
+
+        function destroyAll() {
+          // Disposing the parent cascades to all children
+          parentOwner.dispose();
+          container.replaceChildren();
+          widgetMap.clear();
+          widgetCount.value = 0;
+          // Create a fresh parent owner for future spawns
+          parentOwner = createOwner();
+        }
+
+        const stats = el(
+          'div',
+          { class: 'stats-row' },
+          el('span', { class: 'stat' }, 'Widgets: ', countDisplay),
+          el('span', { class: 'stat' }, 'Effects: ', effectDisplay),
+        );
+
+        const buttons = el(
+          'div',
+          { class: 'buttons-row' },
+          el('button', { onclick: spawnWidget }, '+ Spawn Widget'),
+          el('button', { class: 'danger', onclick: destroyAll }, 'Destroy All'),
+        );
+
+        return panel(
+          'Ownership',
+          'disposal',
+          '#3a2050',
+          'Spawn widgets with ticking timers. Destroy one — its timer stops. Destroy All — everything stops.',
+          buttons,
+          stats,
+          container,
+        );
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // PANEL 4 — Batching
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      function createBatchingPanel() {
+        const a = signal(0);
+        const b = signal(0);
+        const unbatchedCount = signal(0);
+        const batchedCount = signal(0);
+
+        const log = el('div', { class: 'event-log' });
+        const unbatchedDisplay = el('span', { class: 'stat-value' }, '0');
+        const batchedDisplay = el('span', { class: 'stat-value' }, '0');
+
+        function addLog(msg) {
+          const now = new Date();
+          const ts =
+            now.toLocaleTimeString('en', { hour12: false }) +
+            '.' +
+            String(now.getMilliseconds()).padStart(3, '0');
+          const entry = el(
+            'span',
+            { class: 'entry' },
+            el('span', { class: 'ts' }, `[${ts}] `),
+            msg,
+          );
+          log.appendChild(entry);
+          log.appendChild(document.createTextNode('\n'));
+          log.scrollTop = log.scrollHeight;
+        }
+
+        let mode = 'watching'; // 'watching' | 'unbatched' | 'batched'
+
+        effect(() => {
+          const aVal = a.value;
+          const bVal = b.value;
+          if (mode === 'unbatched') {
+            unbatchedCount.value = unbatchedCount.peek() + 1;
+            addLog(`Unbatched effect — A=${aVal}, B=${bVal}`);
+          } else if (mode === 'batched') {
+            batchedCount.value = batchedCount.peek() + 1;
+            addLog(`Batched effect — A=${aVal}, B=${bVal}`);
+          }
+        });
+
+        effect(() => {
+          unbatchedDisplay.textContent = String(unbatchedCount.value);
+        });
+        effect(() => {
+          batchedDisplay.textContent = String(batchedCount.value);
+        });
+
+        function doUnbatched() {
+          mode = 'unbatched';
+          a.value = a.peek() + 1;
+          b.value = b.peek() + 1;
+          mode = 'watching';
+        }
+
+        function doBatched() {
+          mode = 'batched';
+          batch(() => {
+            a.value = a.peek() + 1;
+            b.value = b.peek() + 1;
+          });
+          mode = 'watching';
+        }
+
+        function clearLog() {
+          log.replaceChildren();
+          unbatchedCount.value = 0;
+          batchedCount.value = 0;
+        }
+
+        const stats = el(
+          'div',
+          { class: 'stats-row' },
+          el('span', { class: 'stat' }, 'Unbatched propagations: ', unbatchedDisplay),
+          el('span', { class: 'stat' }, 'Batched propagations: ', batchedDisplay),
+        );
+
+        const buttons = el(
+          'div',
+          { class: 'buttons-row' },
+          el('button', { onclick: doUnbatched }, 'Update Unbatched'),
+          el('button', { onclick: doBatched }, 'Update Batched'),
+          el('button', { class: 'secondary', onclick: clearLog }, 'Clear'),
+        );
+
+        return panel(
+          'Batching',
+          'batch',
+          '#20405a',
+          'Unbatched writes cause 2 propagations. Batched writes cause 1. Check the counters.',
+          buttons,
+          stats,
+          log,
+        );
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // PANEL 5 — Glitch-Free Diamond
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      function createDiamondPanel() {
+        const s = signal(1);
+        const compA = computed(() => s.value * 2);
+        const compB = computed(() => s.value * 3);
+        const totalUpdates = signal(0);
+        const glitchCount = signal(0);
+
+        const sEl = el('span', { class: 'val' }, '1');
+        const aEl = el('span', { class: 'val' }, '2');
+        const bEl = el('span', { class: 'val' }, '3');
+        const updatesEl = el('span', { class: 'stat-value' }, '0');
+        const glitchEl = el('span', { class: 'glitch-counter zero' }, '0');
+
+        effect(() => {
+          const aVal = compA.value;
+          const bVal = compB.value;
+          totalUpdates.value = totalUpdates.peek() + 1;
+
+          // Consistency check: A/2 should always equal B/3 (both equal S)
+          if (aVal / 2 !== bVal / 3) {
+            glitchCount.value = glitchCount.peek() + 1;
+          }
+
+          sEl.textContent = String(s.peek());
+          aEl.textContent = String(aVal);
+          bEl.textContent = String(bVal);
+        });
+
+        effect(() => {
+          updatesEl.textContent = String(totalUpdates.value);
+        });
+        effect(() => {
+          const g = glitchCount.value;
+          glitchEl.textContent = String(g);
+          glitchEl.className = 'glitch-counter ' + (g === 0 ? 'zero' : 'nonzero');
+        });
+
+        function rapidUpdate() {
+          for (let i = 0; i < 1000; i++) {
+            s.value = s.peek() + 1;
+          }
+        }
+
+        const values = el(
+          'div',
+          { class: 'diamond-values' },
+          el('div', { class: 'diamond-var' }, el('div', { class: 'label' }, 'S'), sEl),
+          el('div', { class: 'diamond-var' }, el('div', { class: 'label' }, 'A = S×2'), aEl),
+          el('div', { class: 'diamond-var' }, el('div', { class: 'label' }, 'B = S×3'), bEl),
+        );
+
+        const stats = el(
+          'div',
+          { class: 'stats-row' },
+          el('span', { class: 'stat' }, 'Updates: ', updatesEl),
+          el('span', { class: 'stat' }, 'Glitches: ', glitchEl),
+        );
+
+        const buttons = el(
+          'div',
+          { class: 'buttons-row' },
+          el('button', { onclick: rapidUpdate }, 'Rapid Update (×1000)'),
+        );
+
+        return panel(
+          'Glitch-Free Diamond',
+          'consistency',
+          '#4a2020',
+          "Signal S feeds computed A (S×2) and B (S×3). An effect reads both — if A/2 ≠ B/3, that's a glitch. Hammer the button: glitch counter stays at 0.",
+          values,
+          stats,
+          buttons,
+        );
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // Mount
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      const app = document.getElementById('app');
+      app.appendChild(createGridPanel());
+      app.appendChild(createVersionSkipPanel());
+      app.appendChild(createOwnershipPanel());
+      app.appendChild(createBatchingPanel());
+      app.appendChild(createDiamondPanel());
+
+      console.log('✓ Lattice Signals demo loaded');
+    </script>
+  </body>
+</html>
